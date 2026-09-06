@@ -1,0 +1,746 @@
+openapi: 3.1.0
+info:
+  # Do not change the title, if the title changes, the import paths will be broken
+  title: Api
+  version: 0.1.0
+  description: API specification
+servers:
+  - url: /api
+    description: Base API path
+tags:
+  - name: health
+    description: Health operations
+  - name: worker
+    description: Worker profile and task workflow
+  - name: admin
+    description: Task publishing and submission review
+  - name: Storage
+    description: Object storage upload and serving endpoints
+paths:
+  /healthz:
+    get:
+      operationId: healthCheck
+      tags: [health]
+      summary: Health check
+      description: Returns server health status
+      responses:
+        "200":
+          description: Healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+  /worker/me:
+    get:
+      operationId: getWorkerProfile
+      tags: [worker]
+      summary: Get the current worker profile
+      responses:
+        "200":
+          description: Current worker profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkerProfile"
+    patch:
+      operationId: updateWorkerProfile
+      tags: [worker]
+      summary: Update the current worker profile
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WorkerProfileUpdate"
+      responses:
+        "200":
+          description: Updated worker profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkerProfile"
+  /worker/screening:
+    get:
+      operationId: getWorkerScreening
+      tags: [worker]
+      summary: Get the current worker's mandatory video screening
+      responses:
+        "200":
+          description: Mandatory video screening state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkerScreening"
+  /worker/dashboard:
+    get:
+      operationId: getWorkerDashboard
+      tags: [worker]
+      summary: Get the current worker dashboard
+      responses:
+        "200":
+          description: Worker dashboard
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkerDashboard"
+  /tasks:
+    get:
+      operationId: listTasks
+      tags: [worker]
+      summary: List tasks available to the current worker
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [available, claimed, submitted, all]
+            default: available
+        - name: category
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Matching tasks
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Task"
+  /tasks/{taskId}:
+    get:
+      operationId: getTask
+      tags: [worker]
+      summary: Get a task by id
+      parameters:
+        - $ref: "#/components/parameters/TaskId"
+      responses:
+        "200":
+          description: Task details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Task"
+        "404":
+          description: Task not found
+    post:
+      operationId: claimTask
+      tags: [worker]
+      summary: Claim an available task
+      parameters:
+        - $ref: "#/components/parameters/TaskId"
+      responses:
+        "200":
+          description: Claimed task
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Task"
+        "409":
+          description: Task is no longer available
+  /tasks/{taskId}/submit:
+    post:
+      operationId: submitTask
+      tags: [worker]
+      summary: Submit completed task work
+      parameters:
+        - $ref: "#/components/parameters/TaskId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TaskSubmissionInput"
+      responses:
+        "201":
+          description: Submission created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Submission"
+  /tasks/{taskId}/video-submit:
+    post:
+      operationId: submitVideoScreening
+      tags: [worker]
+      summary: Submit a recorded video screening
+      parameters:
+        - $ref: "#/components/parameters/TaskId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VideoScreeningInput"
+      responses:
+        "201":
+          description: Video screening submitted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Submission"
+        "409":
+          description: Screening cannot be submitted in its current state
+  /submissions:
+    get:
+      operationId: listSubmissions
+      tags: [worker]
+      summary: List the current worker's submissions
+      responses:
+        "200":
+          description: Worker submissions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Submission"
+  /submissions/{submissionId}/video:
+    get:
+      operationId: getSubmissionVideo
+      tags: [worker]
+      summary: Stream a private video submission
+      parameters:
+        - name: submissionId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Private video stream
+          content:
+            video/webm:
+              schema:
+                type: string
+                format: binary
+        "403":
+          description: Not allowed to view this video
+        "404":
+          description: Video submission not found
+  /admin/tasks:
+    post:
+      operationId: createTask
+      tags: [admin]
+      summary: Publish a new task
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TaskInput"
+      responses:
+        "201":
+          description: Published task
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Task"
+  /admin/overview:
+    get:
+      operationId: getDispatcherOverview
+      tags: [admin]
+      summary: Get dispatcher monitoring overview
+      responses:
+        "200":
+          description: Dispatcher overview
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DispatcherOverview"
+  /admin/review:
+    get:
+      operationId: listReviewQueue
+      tags: [admin]
+      summary: List submissions waiting for review
+      responses:
+        "200":
+          description: Review queue
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ReviewItem"
+  /admin/submissions/{submissionId}/review:
+    post:
+      operationId: reviewSubmission
+      tags: [admin]
+      summary: Review a worker submission
+      parameters:
+        - name: submissionId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReviewInput"
+      responses:
+        "200":
+          description: Reviewed submission
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Submission"
+  /storage/uploads/request-url:
+    post:
+      operationId: requestUploadUrl
+      tags: [Storage]
+      summary: Request a presigned URL for a private upload
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UploadUrlRequest"
+      responses:
+        "200":
+          description: Presigned upload URL
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UploadUrlResponse"
+        "400":
+          description: Missing or invalid upload metadata
+        "401":
+          description: Authentication required
+  /storage/objects/{objectPath}:
+    get:
+      operationId: getStorageObject
+      tags: [Storage]
+      summary: Stream a private object owned by the current user
+      parameters:
+        - name: objectPath
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Private object stream
+          content:
+            "*/*":
+              schema:
+                type: string
+                format: binary
+        "403":
+          description: Not allowed to view this object
+        "404":
+          description: Object not found
+components:
+  parameters:
+    TaskId:
+      name: taskId
+      in: path
+      required: true
+      schema:
+        type: string
+  schemas:
+    HealthStatus:
+      type: object
+      properties:
+        status:
+          type: string
+      required:
+        - status
+    WorkerProfile:
+      type: object
+      required:
+        - id
+        - name
+        - email
+        - status
+        - availability
+        - skills
+        - languages
+        - onboardingProgress
+        - internshipTermsAccepted
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        email:
+          type: string
+        city:
+          type: string
+        country:
+          type: string
+        phoneNumber:
+          type: string
+        education:
+          type: string
+        yearOfPass:
+          type: number
+        gpa:
+          type: string
+        avatarInitials:
+          type: string
+        status:
+          type: string
+          enum: [pending, active, paused]
+        availability:
+          type: string
+          enum: [available, away]
+        timezone:
+          type: string
+        skills:
+          type: array
+          items:
+            type: string
+        languages:
+          type: array
+          items:
+            type: string
+        experience:
+          type: string
+        weeklyHours:
+          type: number
+        onboardingProgress:
+          type: number
+          minimum: 0
+          maximum: 100
+        internshipTermsAccepted:
+          type: boolean
+        internshipTermsAcceptedAt:
+          type: ["string", "null"]
+          format: date-time
+    WorkerProfileUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+        city:
+          type: string
+        country:
+          type: string
+        phoneNumber:
+          type: string
+        education:
+          type: string
+        yearOfPass:
+          type: number
+        gpa:
+          type: string
+        availability:
+          type: string
+          enum: [available, away]
+        timezone:
+          type: string
+        skills:
+          type: array
+          items:
+            type: string
+        languages:
+          type: array
+          items:
+            type: string
+        experience:
+          type: string
+        weeklyHours:
+          type: number
+        onboardingProgress:
+          type: number
+          minimum: 0
+          maximum: 100
+        internshipTermsAccepted:
+          type: boolean
+    Task:
+      type: object
+      required:
+        - id
+        - title
+        - description
+        - category
+        - difficulty
+        - estimatedMinutes
+        - payout
+        - status
+        - taskType
+        - requiredSkills
+        - submissionsCount
+        - createdAt
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        description:
+          type: string
+        category:
+          type: string
+        difficulty:
+          type: string
+          enum: [starter, intermediate, advanced]
+        estimatedMinutes:
+          type: number
+        payout:
+          type: number
+        status:
+          type: string
+          enum: [available, claimed, submitted, approved, rejected]
+        taskType:
+          type: string
+          enum: [standard, video_screening]
+        requiredSkills:
+          type: array
+          items:
+            type: string
+        submissionsCount:
+          type: number
+        createdAt:
+          type: string
+          format: date-time
+        dueAt:
+          type: ["string", "null"]
+          format: date-time
+        claimedAt:
+          type: ["string", "null"]
+          format: date-time
+    TaskInput:
+      type: object
+      required: [title, description, category, difficulty, estimatedMinutes, payout, requiredSkills]
+      properties:
+        title:
+          type: string
+          minLength: 1
+        description:
+          type: string
+          minLength: 1
+        category:
+          type: string
+        difficulty:
+          type: string
+          enum: [starter, intermediate, advanced]
+        estimatedMinutes:
+          type: number
+          minimum: 1
+        payout:
+          type: number
+          minimum: 0
+        requiredSkills:
+          type: array
+          items:
+            type: string
+    TaskSubmissionInput:
+      type: object
+      required: [response]
+      properties:
+        response:
+          type: string
+          minLength: 1
+        notes:
+          type: string
+    Submission:
+      type: object
+      required:
+        - id
+        - taskId
+        - taskTitle
+        - status
+        - submittedAt
+        - payout
+      properties:
+        id:
+          type: string
+        taskId:
+          type: string
+        taskTitle:
+          type: string
+        workerName:
+          type: string
+        response:
+          type: string
+        notes:
+          type: ["string", "null"]
+        status:
+          type: string
+          enum: [in_progress, submitted, approved, rejected]
+        submittedAt:
+          type: string
+          format: date-time
+        payout:
+          type: number
+        reviewerNote:
+          type: ["string", "null"]
+        videoUrl:
+          type: ["string", "null"]
+    VideoScreeningInput:
+      type: object
+      required: [objectPath, contentType, durationSeconds]
+      properties:
+        objectPath:
+          type: string
+          minLength: 1
+        contentType:
+          type: string
+          minLength: 1
+        durationSeconds:
+          type: number
+          minimum: 1
+          maximum: 180
+    WorkerScreening:
+      type: object
+      required: [task, status, submissionId, videoUrl]
+      properties:
+        task:
+          $ref: "#/components/schemas/Task"
+        status:
+          type: string
+          enum: [pending, submitted, approved, rejected]
+        submissionId:
+          type: ["string", "null"]
+        videoUrl:
+          type: ["string", "null"]
+    UploadUrlRequest:
+      type: object
+      required: [name, size, contentType]
+      properties:
+        name:
+          type: string
+          minLength: 1
+        size:
+          type: number
+          minimum: 1
+        contentType:
+          type: string
+          minLength: 1
+    UploadUrlResponse:
+      type: object
+      required: [uploadURL, objectPath]
+      properties:
+        uploadURL:
+          type: string
+        objectPath:
+          type: string
+        metadata:
+          $ref: "#/components/schemas/UploadUrlRequest"
+    ReviewItem:
+      allOf:
+        - $ref: "#/components/schemas/Submission"
+        - type: object
+          required: [workerEmail, category]
+          properties:
+            workerEmail:
+              type: string
+            category:
+              type: string
+    ReviewInput:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [approved, rejected]
+        reviewerNote:
+          type: string
+    WorkerDashboard:
+      type: object
+      required: [profile, stats, featuredTasks, recentSubmissions]
+      properties:
+        profile:
+          $ref: "#/components/schemas/WorkerProfile"
+        stats:
+          type: object
+          required: [availableTasks, completedTasks, pendingReview, earned]
+          properties:
+            availableTasks:
+              type: number
+            completedTasks:
+              type: number
+            pendingReview:
+              type: number
+            earned:
+              type: number
+        featuredTasks:
+          type: array
+          items:
+            $ref: "#/components/schemas/Task"
+        recentSubmissions:
+          type: array
+          items:
+            $ref: "#/components/schemas/Submission"
+    DispatcherWorker:
+      type: object
+      required:
+        - id
+        - name
+        - email
+        - availability
+        - status
+        - skills
+        - completedTasks
+        - pendingReview
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        email:
+          type: string
+        availability:
+          type: string
+          enum: [available, away]
+        status:
+          type: string
+          enum: [pending, active, paused]
+        skills:
+          type: array
+          items:
+            type: string
+        activeTaskTitle:
+          type: ["string", "null"]
+        activeTaskStatus:
+          type: ["string", "null"]
+        lastSubmissionAt:
+          type: ["string", "null"]
+          format: date-time
+        completedTasks:
+          type: number
+        pendingReview:
+          type: number
+    DispatcherTask:
+      allOf:
+        - $ref: "#/components/schemas/Task"
+        - type: object
+          required: [claimedByName, claimedByEmail]
+          properties:
+            claimedByName:
+              type: ["string", "null"]
+            claimedByEmail:
+              type: ["string", "null"]
+    DispatcherOverview:
+      type: object
+      required: [stats, workers, tasks]
+      properties:
+        stats:
+          type: object
+          required: [totalWorkers, availableWorkers, activeTasks, tasksInReview, completedToday, completionRate]
+          properties:
+            totalWorkers:
+              type: number
+            availableWorkers:
+              type: number
+            activeTasks:
+              type: number
+            tasksInReview:
+              type: number
+            completedToday:
+              type: number
+            completionRate:
+              type: number
+        workers:
+          type: array
+          items:
+            $ref: "#/components/schemas/DispatcherWorker"
+        tasks:
+          type: array
+          items:
+            $ref: "#/components/schemas/DispatcherTask"
+

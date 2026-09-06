@@ -1,0 +1,28 @@
+kind = "web"
+previewPath = "/"
+title = "LLM Worker Hub"
+description = "A worker marketplace for onboarding freelance contributors, matching eligible people with daily LLM training tasks, and tracking submissions through review."
+version = "1.0.0"
+id = "artifacts/llm-worker-hub"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 22908
+
+[services.development]
+run = "pnpm --filter @workspace/llm-worker-hub run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/llm-worker-hub", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/llm-worker-hub/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "22908"
+BASE_PATH = "/"
